@@ -1,0 +1,19 @@
+*,
+*::after,
+*::before{
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+}
+button{
+  background-color: transparent;
+  cursor: pointer;
+  margin-right: 50px;
+}
+
+.app{
+  video{
+    width: 800px;
+  }
+}
