@@ -4,6 +4,7 @@ import "./App.scss"
 import classnames from "classnames"
 import { Modal, Select } from "antd"
 import type { SelectProps } from "antd"
+import { downloadBlob } from "./utils/download"
 
 // const ffmpeg = createFFmpeg()
 // ffmpeg.load().then(() => {
@@ -75,17 +76,10 @@ function App() {
 
   const onDownload = () => {
     // const videoBlob = transformedBlob.current
-    const videoBlob = new Blob(blobs.current, { type: "video/webm" })
-    const url = URL.createObjectURL(videoBlob)
-    const link = document.createElement("a")
-    link.href = url
-    // link.download = "test.mp4"
-    link.download = "test.webm"
-    document.body.appendChild(link)
-    link.style.display = "none"
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadBlob(blobs.current,{
+      filename:'test',
+      mimeType:'video/webm'
+    })
     blobs.current = []
   }
 
