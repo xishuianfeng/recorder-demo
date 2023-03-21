@@ -1,40 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { createFFmpeg } from "@ffmpeg/ffmpeg"
 import "./App.scss"
-
-interface DeviceListProps {
-  devices: MediaDeviceInfo | MediaDeviceInfo[]
-  selectedId?: string
-  onClick?: (device: MediaDeviceInfo) => void
-}
-const DeviceList = (props: DeviceListProps) => {
-  const { devices, onClick, selectedId } = props
-  const deviceList = Array.isArray(devices) ? devices : [devices]
-  return (
-    <>
-      {deviceList.map((device) => {
-        const { deviceId, groupId, kind, label } = device
-        return (
-          <div
-            className={[
-              "device-info",
-              selectedId === deviceId ? "selected" : undefined,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            key={deviceId}
-            onClick={() => onClick?.(device)}
-          >
-            <div className="device-id">deviceId: {deviceId}</div>
-            <div className="device-group-id">groupId: {groupId}</div>
-            <div className="device-kind">kind: {kind}</div>
-            <div className="device-label">label: {label}</div>
-          </div>
-        )
-      })}
-    </>
-  )
-}
+import classnames from "classnames"
+import { Modal, Select } from "antd"
+import type { SelectProps } from "antd"
 
 // const ffmpeg = createFFmpeg()
 // ffmpeg.load().then(() => {
@@ -62,6 +31,16 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null!)
   const recorderRef = useRef<MediaRecorder>(null!)
   const blobs = useRef<Array<Blob>>([])
+
+  const [deviceList, setDeviceList] = useState<{
+    audioInput: MediaDeviceInfo[]
+    videoInput: MediaDeviceInfo[]
+  }>({
+    audioInput: [],
+    videoInput: [],
+  })
+
+  const [isGetUserMediaModalOpen, setIsGetUserMediaModalOpen] = useState(false)
 
   const onStart = () => {
     window.navigator.mediaDevices.getDisplayMedia().then((stream) => {
@@ -110,27 +89,62 @@ function App() {
     blobs.current = []
   }
 
+  const createOptions = (devices: MediaDeviceInfo[]) => {
+    return devices.map((device) => {
+      return {
+        label: device.label,
+        value: device.deviceId,
+      }
+    })
+  }
+
+  const audioOptions: SelectProps["options"] = createOptions(deviceList.audioInput)
+  const videoOptions: SelectProps["options"] = createOptions(deviceList.videoInput)
+
   const [deviceId, setDeviceId] = useState<{ audio: string; video: string }>({
     audio: "",
     video: "",
   })
+
+  const constraints: MediaStreamConstraints = {
+    video: {},
+    audio: {}
+  }
+
+  const filterValidDevices = (device: MediaDeviceInfo[]) => {
+    return device.filter((device) => device.deviceId && device.groupId)
+  }
+
   const onCameraClick = () => {
-    const constraints: MediaStreamConstraints = {}
-    if (deviceId.video) {
-      constraints.video = {
-        deviceId: deviceId.video,
-      }
-    }
-    if (deviceId.audio) {
-      constraints.audio = {
-        deviceId: deviceId.audio,
-      }
-    }
+    window.navigator.mediaDevices
+      .getUserMedia(constraints)
+      .then((stream) => {
+        const audioInputDeviceNumber = filterValidDevices(deviceList.audioInput).length
+        const videoInputDeviceNumber = filterValidDevices(deviceList.videoInput).length
+
+        if (audioInputDeviceNumber === 0 || videoInputDeviceNumber === 0) {
+          onDeviceChange()
+        }
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+        setIsGetUserMediaModalOpen(true)
+      })
+      .catch((error) => {
+        alert('没有权限莫，怎么获取呢')
+      })
+    return
+  }
+
+  //开始录屏
+  const onStartRecord = () => {
+    constraints.audio = {deviceId:deviceId.audio}
+    constraints.video = {deviceId:deviceId.video}
+    setIsGetUserMediaModalOpen(false)
 
     window.navigator.mediaDevices
       .getUserMedia(constraints)
       .then((stream) => {
-        console.log("stream =>", stream)
         videoRef.current.srcObject = stream
         const recorder = new MediaRecorder(stream)
         recorderRef.current = recorder
@@ -146,35 +160,22 @@ function App() {
       })
   }
 
-  const [deviceList, setDeviceList] = useState<{
-    audioInput: MediaDeviceInfo[]
-    audioOutput: MediaDeviceInfo[]
-    videoInput: MediaDeviceInfo[]
-  }>({
-    audioInput: [],
-    audioOutput: [],
-    videoInput: [],
-  })
+  const onDeviceChange = () => {
+    window.navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const audioInputDevices = devices.filter(
+        (device) => device.kind === "audioinput",
+      )
+      const videoInputDevices = devices.filter(
+        (device) => device.kind === "videoinput",
+      )
+      setDeviceList({
+        audioInput: audioInputDevices,
+        videoInput: videoInputDevices,
+      })
+    })
+  }
 
   useEffect(() => {
-    const onDeviceChange = () => {
-      window.navigator.mediaDevices.enumerateDevices().then((devices) => {
-        const audioInputDevices = devices.filter(
-          (device) => device.kind === "audioinput",
-        )
-        const audioOutputDevices = devices.filter(
-          (device) => device.kind === "audiooutput",
-        )
-        const videoInputDevices = devices.filter(
-          (device) => device.kind === "videoinput",
-        )
-        setDeviceList({
-          audioInput: audioInputDevices,
-          audioOutput: audioOutputDevices,
-          videoInput: videoInputDevices,
-        })
-      })
-    }
     onDeviceChange()
     window.navigator.mediaDevices.addEventListener(
       "devicechange",
@@ -188,6 +189,8 @@ function App() {
       )
     }
   }, [])
+
+  const startRecordButtonDisabled = !deviceId.audio || !deviceId.video
 
   return (
     <div className="App">
@@ -203,38 +206,45 @@ function App() {
         <video ref={videoRef} autoPlay></video>
       </div>
 
-      <div className="devices">
-        <div className="audio-input">
-          录音设备:
-          <DeviceList
-            selectedId={deviceId.audio}
-            devices={deviceList.audioInput}
-            onClick={(deviceInfo) => {
-              setDeviceId((deviceId) => {
-                return {
-                  ...deviceId,
-                  audio: deviceInfo.deviceId,
-                }
-              })
-            }}
-          ></DeviceList>
-        </div>
-
-        <div className="video-input">
-          摄像头：
-          <DeviceList
-            selectedId={deviceId.video}
-            devices={deviceList.videoInput}
-            onClick={(deviceInfo) => {
-              setDeviceId((deviceId) => {
-                return {
-                  ...deviceId,
-                  video: deviceInfo.deviceId,
-                }
-              })
-            }}
-          ></DeviceList>
-        </div>
+      <div>
+        <Modal
+          open={isGetUserMediaModalOpen}
+          okText="开始录屏"
+          cancelText="取消"
+          closable={false}
+          onOk={onStartRecord}
+          onCancel={() => {
+            setIsGetUserMediaModalOpen(false)
+          }}
+          okButtonProps={{ disabled: startRecordButtonDisabled }}
+        >
+          <div>
+            选择音频设备：
+            <Select style={{ width: '100%' }} value={deviceId.audio}
+              onChange={(value) => {
+                setDeviceId((deviceIds) => {
+                  return {
+                    ...deviceIds,
+                    audio: value
+                  }
+                })
+              }}
+              options={audioOptions}></Select>
+          </div>
+          <div className="video-device-select">
+            选择视频设备：
+            <Select style={{ width: '100%' }} value={deviceId.video} 
+                onChange={(value) => {
+                  setDeviceId((deviceIds) => {
+                    return {
+                      ...deviceIds,
+                      video: value
+                    }
+                  })
+                }}
+              options={videoOptions}></Select>
+          </div>
+        </Modal>
       </div>
     </div>
   )
