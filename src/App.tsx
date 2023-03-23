@@ -42,9 +42,13 @@ function App() {
   })
 
   const [isGetUserMediaModalOpen, setIsGetUserMediaModalOpen] = useState(false)
+  const [isSelectResolutionOpen, setIsSelectResolutionOpen] = useState(false)
 
   const onStart = () => {
-    window.navigator.mediaDevices.getDisplayMedia().then((stream) => {
+    console.log(constraints.video);
+
+    setIsSelectResolutionOpen(false)
+    window.navigator.mediaDevices.getDisplayMedia(constraints).then((stream) => {
       videoRef.current.srcObject = stream
       const recorder = new MediaRecorder(stream)
       recorderRef.current = recorder
@@ -55,6 +59,10 @@ function App() {
       recorder.addEventListener("dataavailable", dataAvailableListener)
       recorder.start()
     })
+  }
+
+  const onSelectResolution = () => {
+    setIsSelectResolutionOpen(true)
   }
 
   const onEnd = () => {
@@ -76,9 +84,9 @@ function App() {
 
   const onDownload = () => {
     // const videoBlob = transformedBlob.current
-    downloadBlob(blobs.current,{
-      filename:'test',
-      mimeType:'video/webm'
+    downloadBlob(blobs.current, {
+      filename: 'test',
+      mimeType: 'video/webm'
     })
     blobs.current = []
   }
@@ -94,16 +102,32 @@ function App() {
 
   const audioOptions: SelectProps["options"] = createOptions(deviceList.audioInput)
   const videoOptions: SelectProps["options"] = createOptions(deviceList.videoInput)
+  const resolutionOptions: SelectProps["options"] = [
+    { value: '600x360', label: '360p' },
+    { value: '720x480', label: '480p' },
+    { value: '1280x720', label: '720p' },
+    { value: '1920x1080', label: '1080p' },
+    { value: '2560x1440', label: '2k' },
+    { value: '4096x2160', label: '4k' },
+  ]
 
   const [deviceId, setDeviceId] = useState<{ audio: string; video: string }>({
     audio: "",
     video: "",
   })
 
+  const [videoResolution, setVideoResolution] = useState<{
+    width: number, height: number
+  }>({
+    width: 0,
+    height: 0
+  })
   const constraints: MediaStreamConstraints = {
     video: {},
     audio: {}
   }
+  constraints.video = videoResolution
+  console.log(constraints.video);
 
   const filterValidDevices = (device: MediaDeviceInfo[]) => {
     return device.filter((device) => device.deviceId && device.groupId)
@@ -132,8 +156,11 @@ function App() {
 
   //开始录屏
   const onStartRecord = () => {
-    constraints.audio = {deviceId:deviceId.audio}
-    constraints.video = {deviceId:deviceId.video}
+    constraints.audio = { deviceId: deviceId.audio }
+    constraints.video = { deviceId: deviceId.video }
+    if (videoResolution.width !== 0 && videoResolution.height !== 0) {
+      constraints.video = videoResolution
+    }
     setIsGetUserMediaModalOpen(false)
 
     window.navigator.mediaDevices
@@ -185,19 +212,47 @@ function App() {
   }, [])
 
   const startRecordButtonDisabled = !deviceId.audio || !deviceId.video
+  const startButtonDisabled = (videoResolution.width === 0) && (videoResolution.height === 0)
 
   return (
     <div className="App">
       <div className="buttons">
         <button onClick={onCameraClick}>请求用户媒体</button>
-        <button onClick={onStart}>开始录制</button>
+        <button onClick={onSelectResolution}>选择分辨率</button>
         <button onClick={onEnd}>结束录制</button>
         <button onClick={onTransform}>转换格式</button>
         <button onClick={onDownload}>下载</button>
       </div>
-
       <div className="video-container">
         <video ref={videoRef} autoPlay></video>
+      </div>
+
+      <div>
+        <Modal
+          open={isSelectResolutionOpen}
+          okText="开始录制"
+          cancelText="取消"
+          closable={false}
+          onOk={onStart}
+          onCancel={() => {
+            setIsSelectResolutionOpen(false)
+          }}
+          okButtonProps={{ disabled: startButtonDisabled }}
+        >
+          <div>
+            选择分辨率：
+            <Select style={{ width: '100%' }}
+              defaultValue={videoResolution}
+              onChange={(value) => {
+                const width = value.toString().split('x')[0]
+                const height = value.toString().split('x')[1]
+                setVideoResolution({
+                  width: parseInt(width), height: parseInt(height)
+                })
+              }}
+              options={resolutionOptions}></Select>
+          </div>
+        </Modal>
       </div>
 
       <div>
@@ -214,7 +269,8 @@ function App() {
         >
           <div>
             选择音频设备：
-            <Select style={{ width: '100%' }} value={deviceId.audio}
+            <Select style={{ width: '100%' }}
+              value={deviceId.audio}
               onChange={(value) => {
                 setDeviceId((deviceIds) => {
                   return {
@@ -227,15 +283,16 @@ function App() {
           </div>
           <div className="video-device-select">
             选择视频设备：
-            <Select style={{ width: '100%' }} value={deviceId.video} 
-                onChange={(value) => {
-                  setDeviceId((deviceIds) => {
-                    return {
-                      ...deviceIds,
-                      video: value
-                    }
-                  })
-                }}
+            <Select style={{ width: '100%' }}
+              value={deviceId.video}
+              onChange={(value) => {
+                setDeviceId((deviceIds) => {
+                  return {
+                    ...deviceIds,
+                    video: value
+                  }
+                })
+              }}
               options={videoOptions}></Select>
           </div>
         </Modal>
