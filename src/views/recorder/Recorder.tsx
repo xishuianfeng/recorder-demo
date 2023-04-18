@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import { createFFmpeg } from "@ffmpeg/ffmpeg"
-import classnames from "classnames"
-import { Modal, Select } from "antd"
-import type { SelectProps } from "antd"
+import { CheckboxGroupProps } from "antd/es/checkbox"
+import { SelectProps, message, Checkbox, Modal, Select } from "antd"
 import { downloadBlob } from "../../utils/download"
+import ffmpegUtil from "@/utils/ffmpeg"
 
 // const ffmpeg = createFFmpeg()
 // ffmpeg.load().then(() => {
@@ -42,9 +41,12 @@ export const Component = () => {
 
   const [isGetUserMediaModalOpen, setIsGetUserMediaModalOpen] = useState(false)
   const [isSelectResolutionOpen, setIsSelectResolutionOpen] = useState(false)
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false)
+  const [isConfirmButtonLoading, setIsConfirmButtonLoading] = useState(false)
+  const [selectedVideoFormat, setSelectedVideoFormat] =
+  useState<SupportedExtensionNames>("mp4")
 
   const onStart = () => {
-    console.log(constraints.video);
 
     setIsSelectResolutionOpen(false)
     window.navigator.mediaDevices.getDisplayMedia(constraints).then((stream) => {
@@ -71,23 +73,33 @@ export const Component = () => {
     })
     recorderRef.current.stop()
   }
-
-  // 转换成 mp4 格式的 blob
-  const transformedBlob = useRef<Blob>(null!)
-  const onTransform = async () => {
-    // const videoBlob = new Blob(blobs.current)
-    // const mp4Blob = await transformWebm(videoBlob)
-    // console.log("完成！！")
-    // transformedBlob.current = mp4Blob
+  
+  const onDownload = () => {
+    setIsDownloadModalOpen(true)
   }
 
-  const onDownload = () => {
-    // const videoBlob = transformedBlob.current
-    downloadBlob(blobs.current, {
-      filename: 'test',
-      mimeType: 'video/webm'
-    })
-    blobs.current = []
+  const onConfirmDownload = async () => {
+    setIsConfirmButtonLoading(true)
+    // 1. 转换 blob 的格式
+    const videoBlob = new Blob(blobs.current)
+    const outputFilename = `output.${selectedVideoFormat}`
+    try {
+      await ffmpegUtil.init()
+      const transformedBlob = await ffmpegUtil.transformVideoFormat(videoBlob, {
+        inputFilename: "test.webm",
+        outputFilename,
+      })
+
+      // 2. 下载 blob
+      downloadBlob(transformedBlob, {
+        extensionName: selectedVideoFormat,
+        filename: outputFilename,
+      })
+    } catch (error) {
+      console.log(`视频下载失败`, error)
+    } finally {
+      setIsConfirmButtonLoading(false)
+    }
   }
 
   const createOptions = (devices: MediaDeviceInfo[]) => {
@@ -109,6 +121,24 @@ export const Component = () => {
     { value: '2560x1440', label: '2k' },
     { value: '4096x2160', label: '4k' },
   ]
+  const videoFormatOptions: SelectProps["options"] = [
+    {
+      label: "mp4",
+      value: "mp4",
+    },
+    {
+      label: "flv",
+      value: "flv",
+    },
+    {
+      label: "mkv",
+      value: "mkv",
+    },
+    {
+      label: "avi",
+      value: "avi",
+    },
+  ]
 
   const [deviceId, setDeviceId] = useState<{ audio: string; video: string }>({
     audio: "",
@@ -126,7 +156,6 @@ export const Component = () => {
     audio: {}
   }
   constraints.video = videoResolution
-  console.log(constraints.video);
 
   const filterValidDevices = (device: MediaDeviceInfo[]) => {
     return device.filter((device) => device.deviceId && device.groupId)
@@ -219,7 +248,6 @@ export const Component = () => {
         <button onClick={onCameraClick}>请求用户媒体</button>
         <button onClick={onSelectResolution}>选择分辨率</button>
         <button onClick={onEnd}>结束录制</button>
-        <button onClick={onTransform}>转换格式</button>
         <button onClick={onDownload}>下载</button>
       </div>
       <div className="video-container">
@@ -293,6 +321,29 @@ export const Component = () => {
                 })
               }}
               options={videoOptions}></Select>
+          </div>
+        </Modal>
+        <Modal
+          open={isDownloadModalOpen}
+          okText="下载"
+          cancelText="取消"
+          closable={false}
+          onOk={onConfirmDownload}
+          onCancel={() => {
+            setIsDownloadModalOpen(false)
+          }}
+          okButtonProps={{ loading: isConfirmButtonLoading }}
+        >
+          <div>
+            选择下载视频的格式：
+            <Select
+              style={{ width: "100%" }}
+              value={selectedVideoFormat}
+              onChange={(value) => {
+                setSelectedVideoFormat(value)
+              }}
+              options={videoFormatOptions}
+            />
           </div>
         </Modal>
       </div>
