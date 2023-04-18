@@ -242,6 +242,21 @@ export const Component = () => {
   const startRecordButtonDisabled = !deviceId.audio || !deviceId.video
   const startButtonDisabled = (videoResolution.width === 0) && (videoResolution.height === 0)
 
+  const streamSourceOptions = [
+    {
+      label: "摄像头",
+      value: "camera",
+    },
+    {
+      label: "屏幕捕获",
+      value: "screen",
+    },
+  ]
+
+  const onChange: CheckboxGroupProps["onChange"] = (checked) => {
+    console.log("checked ===========>", checked)
+  }
+
   return (
     <div className="App">
       <div className="buttons">
@@ -249,6 +264,11 @@ export const Component = () => {
         <button onClick={onSelectResolution}>选择分辨率</button>
         <button onClick={onEnd}>结束录制</button>
         <button onClick={onDownload}>下载</button>
+        <Checkbox.Group
+          options={streamSourceOptions}
+          defaultValue={["Apple"]}
+          onChange={onChange}
+        />
       </div>
       <div className="video-container">
         <video ref={videoRef} autoPlay></video>
