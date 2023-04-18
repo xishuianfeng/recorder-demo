@@ -25,8 +25,8 @@ const transformVideoFormat = async (
     .then((buffer) => {
       const arrayBuffer = new Uint8Array(buffer, 0, buffer.byteLength)
       // 我们有的：ArrayBuffer 需要的：Uint8Array
-      ffmpeg.FS("writeFile", inputFilename, arrayBuffer)
       console.log(`开始转换: ${inputFilename}`)
+      ffmpeg.FS("writeFile", inputFilename, arrayBuffer)
       return ffmpeg.run("-i", inputFilename, outputFilename)
     })
     .then(() => {
@@ -48,7 +48,7 @@ const init = async () => {
     return
   }
   hasInit = true
-  const ffmpeg = createFFmpeg({
+  ffmpeg = createFFmpeg({
     log: true,
   })
   ffmpeg.setProgress((progress) => {
@@ -68,6 +68,7 @@ const init = async () => {
     .load()
     .then(() => {
       console.log("ffmpeg 加载完成")
+      console.log(ffmpeg);
     })
     .catch((error) => {
       // 如果ffmpeg加载失败，需要让 hasInit 变为 false，允许再次调用 init 函数。

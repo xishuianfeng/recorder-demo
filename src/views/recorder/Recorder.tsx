@@ -47,7 +47,6 @@ export const Component = () => {
   useState<SupportedExtensionNames>("mp4")
 
   const onStart = () => {
-
     setIsSelectResolutionOpen(false)
     window.navigator.mediaDevices.getDisplayMedia(constraints).then((stream) => {
       videoRef.current.srcObject = stream
@@ -84,7 +83,7 @@ export const Component = () => {
     const videoBlob = new Blob(blobs.current)
     const outputFilename = `output.${selectedVideoFormat}`
     try {
-      await ffmpegUtil.init()
+      await ffmpegUtil.init()      
       const transformedBlob = await ffmpegUtil.transformVideoFormat(videoBlob, {
         inputFilename: "test.webm",
         outputFilename,
